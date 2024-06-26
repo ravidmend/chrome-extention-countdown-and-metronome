@@ -12,6 +12,13 @@ document.getElementById('bpm-input').addEventListener('input', () => {
   });
 });
 
+document.getElementById('show-control-bar').addEventListener('click', () => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'showControlBar'});
+  });
+});
+
+
 document.addEventListener('DOMContentLoaded', function() {
   const countdownTimeInput = document.getElementById('countdown-time');
   const bpmInput = document.getElementById('bpm-input');

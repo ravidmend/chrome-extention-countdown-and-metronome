@@ -182,8 +182,14 @@ function addCountdownAndMetronome() {
       const bpm = Math.max(0, Math.min(180, request.bpm));
       slider.value = bpm;
       bpmDisplay.innerText = bpm;
-      startMetronome(bpm);
+      //startMetronome(bpm);
     }
+
+    if (request.action === 'showControlBar') {
+      metronomeElement.style.display = 'inline-block';
+      closeButton.style.display = 'inline-block';
+    }
+    
   });
 
   chrome.storage.sync.get(['bpm', 'countdownTime'], (data) => {
