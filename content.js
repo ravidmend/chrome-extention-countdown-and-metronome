@@ -4,6 +4,7 @@ function addCountdownAndMetronome() {
   let countdownElement;
   let audioCtx;
   let oscillator;
+  let Clicks = 1; // Initialize Clicks here
 
   function startCountdown(countdownValue) {
     countdownElement = document.createElement('div');
@@ -55,46 +56,55 @@ function addCountdownAndMetronome() {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    if (metronomeInterval) clearInterval(metronomeInterval);
-    const interval = 60000 / bpm;
+    chrome.storage.sync.get('Clicks', (data) => {
+      Clicks = data.Clicks || Clicks; // Ensure Clicks is set from storage or defaults to 1
+      if (metronomeInterval) clearInterval(metronomeInterval);
+      const interval = 60000 / (bpm * Clicks);
+      metronomeInterval = setInterval(() => {
+        playTick();
+      }, interval);
 
-    metronomeInterval = setInterval(() => {
-      playTick();
-    }, interval);
-
-    startButton.style.display = 'none';
-    stopButton.style.display = 'inline-block';
+      startButton.style.display = 'none';
+      stopButton.style.display = 'inline-block';
+    });
   }
 
   function stopMetronome() {
     if (metronomeInterval) clearInterval(metronomeInterval);
-
     stopButton.style.display = 'none';
     startButton.style.display = 'inline-block';
+    clickCount = 0; // Reset click count
   }
 
+  let clickCount = 0;
   function playTick() {
     if (!oscillator) {
       oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
-
       oscillator.connect(gainNode);
       gainNode.connect(audioCtx.destination);
 
-      oscillator.type = 'square';
-      oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime);
+      // Change frequency based on click count
+      if (clickCount % Clicks === 0) {
+        oscillator.frequency.setValueAtTime(1500, audioCtx.currentTime); // Different sound
+      } else {
+        oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime); // Regular sound
+      }
+
       gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.1);
 
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + 0.1);
-
       oscillator.onended = () => {
         oscillator = null;
       };
+
+      clickCount++; // Increment the counter
     }
   }
 
+  // Creating the metronome UI
   const metronomeElement = document.createElement('div');
   metronomeElement.id = 'metronome';
   metronomeElement.style.cssText = `
@@ -106,7 +116,7 @@ function addCountdownAndMetronome() {
     border: 1px solid #ccc;
     border-radius: 5px;
     width: 200px; /* Set a fixed width to prevent background expansion */
-    height: 100px
+    height: 100px;
   `;
   metronomeElement.innerHTML = `
     <input type="range" id="metronome-slider" min="0" max="180" value="120" style="margin-bottom: 10px;">
@@ -118,6 +128,7 @@ function addCountdownAndMetronome() {
   `;
   document.body.appendChild(metronomeElement);
 
+  // Close button for metronome UI
   const closeButton = document.createElement('button');
   closeButton.id = 'close-metronome';
   closeButton.style.cssText = `
@@ -133,6 +144,7 @@ function addCountdownAndMetronome() {
   closeButton.innerHTML = '×';
   metronomeElement.appendChild(closeButton);
 
+  // Selecting elements and adding event listeners
   const slider = document.getElementById('metronome-slider');
   const bpmDisplay = document.getElementById('bpm');
   const startButton = document.getElementById('start-metronome');
@@ -144,6 +156,9 @@ function addCountdownAndMetronome() {
     const bpm = Math.max(0, Math.min(180, slider.value));
     bpmDisplay.innerText = bpm;
     chrome.storage.sync.set({ bpm: bpm });
+    if (stopButton.style.display !== 'none') {
+      startMetronome(bpm);
+    }
   });
 
   startButton.addEventListener('click', () => {
@@ -157,11 +172,10 @@ function addCountdownAndMetronome() {
 
   countdownButton.addEventListener('click', () => {
     chrome.storage.sync.get('countdownTime', (data) => {
-      if (data.countdownTime) {
-        startCountdown(data.countdownTime);
-        countdownButton.style.display = 'none';
-        cancelCountdownButton.style.display = 'inline-block';
-      }
+      const countdownTime = data.countdownTime || 5; // Default countdown time
+      startCountdown(countdownTime);
+      countdownButton.style.display = 'none';
+      cancelCountdownButton.style.display = 'inline-block';
     });
   });
 
@@ -177,21 +191,31 @@ function addCountdownAndMetronome() {
     closeButton.style.display = 'none';
   });
 
+  // Chrome extension message listener for updates
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'setBPM') {
       const bpm = Math.max(0, Math.min(180, request.bpm));
       slider.value = bpm;
       bpmDisplay.innerText = bpm;
-      //startMetronome(bpm);
+      if (stopButton.style.display !== 'none') {
+        startMetronome(bpm);
+      }
+    }
+
+    if (request.action === 'setClicks') {
+      Clicks = Math.max(0, Math.min(16, request.Clicks));
+      if (stopButton.style.display !== 'none') {
+        startMetronome(bpm);
+      }
     }
 
     if (request.action === 'showControlBar') {
       metronomeElement.style.display = 'inline-block';
       closeButton.style.display = 'inline-block';
     }
-    
   });
 
+  // Initial setup from storage
   chrome.storage.sync.get(['bpm', 'countdownTime'], (data) => {
     if (data.bpm) {
       const bpm = Math.max(0, Math.min(180, data.bpm));
@@ -207,12 +231,13 @@ function addCountdownAndMetronome() {
     }
   });
 
+  // Make the metronome draggable
   makeElementDraggable(metronomeElement, slider);
 }
 
 function makeElementDraggable(elmnt, slider) {
   let pos3 = 0, pos4 = 0;
-  slider.onmousedown = stopDragging;////////////////
+  slider.onmousedown = stopDragging; // Prevent slider interaction from triggering drag
   elmnt.onmousedown = dragMouseDown;
 
   function dragMouseDown(e) {
@@ -236,17 +261,19 @@ function makeElementDraggable(elmnt, slider) {
     if (newTop + elmnt.offsetHeight > window.innerHeight) newTop = window.innerHeight - elmnt.offsetHeight;
     if (newLeft + elmnt.offsetWidth > window.innerWidth) newLeft = window.innerWidth - elmnt.offsetWidth;
 
-    elmnt.style.top = newTop + "px";
-    elmnt.style.left = newLeft + "px";
+    elmnt.style.top = newTop + 'px';
+    elmnt.style.left = newLeft + 'px';
   }
 
-  function closeDragElement() {
+  function stopDragging() {
     document.onmouseup = null;
     document.onmousemove = null;
   }
-  function stopDragging(e) {
-    e.stopPropagation();
+
+  function closeDragElement() {
+    stopDragging();
   }
 }
 
+// Initialize the functionality
 addCountdownAndMetronome();
