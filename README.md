@@ -5,8 +5,12 @@ This Chrome extension is for guitar players who want a few seconds to set up bef
 ## Features
 
 - **Start Countdown:** Pause the video and start a countdown timer to give you time to get ready.
-- **Metronome:** Adjust the beats per minute (BPM) to match the video's tempo.
+- **Metronome:** Adjust the beats per minute (BPM) to match the video's tempo. The metronome can be configured with a variable number of clicks per beat.
 - **Close Button:** Easily hide the control bar and stop the metronome.
+
+## Clicks Option
+
+The metronome feature includes an option to set the number of clicks per beat (Clicks). This allows users to customize the metronome sound to their preference, providing flexibility in rhythm perception and practice.
 
 ## Installation
 
@@ -20,7 +24,7 @@ This Chrome extension is for guitar players who want a few seconds to set up bef
 1. Open a YouTube video.
 2. Use the control bar at the bottom right of the screen to:
    - Start a countdown timer.
-   - Adjust the metronome BPM.
+   - Adjust the metronome BPM and clicks per beat.
    - Start and stop the metronome.
    - Close the control bar using the '×' button.
 
